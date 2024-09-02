@@ -22,5 +22,4 @@ global with sharing class ContactHandler {
             return 'create '+newContact.Id;
         }
     }
-
 }
