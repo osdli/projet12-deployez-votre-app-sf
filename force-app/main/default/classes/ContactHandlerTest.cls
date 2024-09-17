@@ -16,45 +16,86 @@ public class ContactHandlerTest {
         String email = 'newuser@example.com';
         String firstName = 'New';
         String lastName = 'User';
+
+        // Initialiser RestContext pour la requête HTTP
+        RestRequest req = new RestRequest();
+        RestResponse res = new RestResponse();
+        req.requestURI = '/services/apexrest/CreateContacts';
+        req.httpMethod = 'POST';
+        req.addParameter('email', email);
+        req.addParameter('firstName', firstName);
+        req.addParameter('lastName', lastName);
         
         Test.startTest();
-        String result = ContactHandler.createOrUpdateContact(email, firstName, lastName);
+        RestContext.request = req;
+        RestContext.response = res;
+        ContactHandler.createOrUpdateContact(email, firstName, lastName);
         Test.stopTest();
         
         // Vérifier que le contact a été créé
-        String[] resultParts = result.split(' ');
-        String operation = resultParts[0];
-        String contactId = resultParts[1];
-        
-        System.assertEquals('create', operation, 'Le contact devrait être créé.');
-        
-        Contact createdContact = [SELECT Id, FirstName, LastName, Email FROM Contact WHERE Id = :contactId];
+        Contact createdContact = [SELECT Id, FirstName, LastName, Email, IsActive__c FROM Contact WHERE Email = :email];
         System.assertEquals(firstName, createdContact.FirstName);
         System.assertEquals(lastName, createdContact.LastName);
         System.assertEquals(email, createdContact.Email);
+        System.assertEquals(true, createdContact.IsActive__c, 'Le contact devrait être actif.');
     }
 
     @isTest
-    static void testRetrieveExistingContact() {
-        // Cas 2: Récupération d'un contact existant
+    static void testUpdateExistingContact() {
+        // Cas 2: Mise à jour d'un contact existant
         String email = 'testuser@example.com';
-        String firstName = 'Updated';
+        String newFirstName = 'Updated';
         String lastName = 'User';
         
+        // Initialiser RestContext pour la requête HTTP
+        RestRequest req = new RestRequest();
+        RestResponse res = new RestResponse();
+        req.requestURI = '/services/apexrest/CreateContacts';
+        req.httpMethod = 'POST';
+        req.addParameter('email', email);
+        req.addParameter('firstName', newFirstName);
+        req.addParameter('lastName', lastName);
+        
         Test.startTest();
-        String result = ContactHandler.createOrUpdateContact(email, firstName, lastName);
+        RestContext.request = req;
+        RestContext.response = res;
+        ContactHandler.createOrUpdateContact(email, newFirstName, lastName);
         Test.stopTest();
         
-        // Vérifier que le contact a été récupéré
-        String[] resultParts = result.split(' ');
-        String operation = resultParts[0];
-        String contactId = resultParts[1];
+        // Vérifier que le contact a été mis à jour
+        Contact existingContact = [SELECT Id, FirstName, LastName, Email, IsActive__c FROM Contact WHERE Email = :email];
+        System.assertEquals(newFirstName, existingContact.FirstName, 'Le prénom devrait être mis à jour.');
+        System.assertEquals(lastName, existingContact.LastName, 'Le nom ne devrait pas être modifié.');
+        System.assertEquals(true, existingContact.IsActive__c, 'Le contact devrait être actif.');
+    }
+
+    @isTest
+    static void testReactivateContact() {
+        // Cas 3: Réactivation d'un contact désactivé
+        String email = 'testuser@example.com';
+
+        // Désactiver un contact existant
+        Contact existingContact = [SELECT Id, FirstName, LastName, Email, IsActive__c FROM Contact WHERE Email = :email];
+        existingContact.IsActive__c = false;
+        update existingContact;
+
+        // Initialiser RestContext pour la requête HTTP
+        RestRequest req = new RestRequest();
+        RestResponse res = new RestResponse();
+        req.requestURI = '/services/apexrest/CreateContacts';
+        req.httpMethod = 'POST';
+        req.addParameter('email', email);
+        req.addParameter('firstName', existingContact.FirstName);
+        req.addParameter('lastName', existingContact.LastName);
         
-        System.assertEquals('retrieve', operation, 'Le contact devrait être récupéré.');
+        Test.startTest();
+        RestContext.request = req;
+        RestContext.response = res;
+        ContactHandler.createOrUpdateContact(email, existingContact.FirstName, existingContact.LastName);
+        Test.stopTest();
         
-        Contact existingContact = [SELECT Id, FirstName, LastName, Email FROM Contact WHERE Id = :contactId];
-        System.assertEquals('Test', existingContact.FirstName); // Les noms ne sont pas mis à jour dans ce cas
-        System.assertEquals('User', existingContact.LastName);
-        System.assertEquals(email, existingContact.Email);
+        // Vérifier que le contact a été réactivé
+        Contact reactivatedContact = [SELECT Id, FirstName, LastName, Email, IsActive__c FROM Contact WHERE Email = :email];
+        System.assertEquals(true, reactivatedContact.IsActive__c, 'Le contact devrait être réactivé.');
     }
 }
